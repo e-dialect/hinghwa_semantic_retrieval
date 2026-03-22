@@ -1,0 +1,2 @@
+# hinghwa_semantic_retrieval
+莆仙方言语义检索子模块
