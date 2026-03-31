@@ -10,8 +10,8 @@ from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data_loader import load_excel_data
-from src.encoder_v2 import encode_entry_full_text, encode_query, VECTOR_DIM
+from src1.data_loader import load_excel_data
+from src1.encoder_v2 import encode_entry_full_text, encode_query, VECTOR_DIM
 
 INDEX_PATH = "models/dialect_index_v2.faiss"
 ID_MAP_PATH = "models/entry_id_map_v2.pkl"

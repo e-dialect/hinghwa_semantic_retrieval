@@ -10,9 +10,9 @@ from tqdm import tqdm
 # 把项目根目录加入Python路径，解决导入问题
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data_loader import load_excel_data
-from src.encoder import encode_entry_with_weights, encode_query, VECTOR_DIM
-from src.query_rewriter import rewrite_query
+from src1.data_loader import load_excel_data
+from src1.encoder_v1 import encode_entry_with_weights, encode_query, VECTOR_DIM
+from src1.query_rewriter import rewrite_query
 
 # ====================== 配置区域 ======================
 # FAISS索引保存路径

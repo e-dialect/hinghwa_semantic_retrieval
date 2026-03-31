@@ -1,4 +1,4 @@
-from src.vector_db import semantic_search
+from src1.vector_db_v1 import semantic_search
 
 def main():
     """

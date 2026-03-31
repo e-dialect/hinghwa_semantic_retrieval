@@ -1,5 +1,5 @@
 # demo.py（方案二版本）
-from src.vector_db_v2 import semantic_search_v2  # 改成导入v2的函数
+from src1.vector_db_v2 import semantic_search_v2  # 改成导入v2的函数
 
 def interactive_search():
     print("="*60)
