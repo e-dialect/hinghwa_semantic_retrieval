@@ -4,8 +4,12 @@ from src.matcher import MatcherManager
 from src.pre_intent_classifier import PreIntentClassifier
 from src.utils.common_utils import clean_ipa_str
 from src.data_loader import FIELD_MAPPING
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 import re
+import argparse
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse, unquote
 
 # ========== 日志屏蔽 ==========
 import warnings
@@ -29,10 +33,24 @@ IPA_CHAR_CACHE = os.path.join(CACHE_DIR, "ipa_chars.json")
 DATASET_SIGNATURE = os.path.join(CACHE_DIR, "dataset_signature.txt")
 
 # ========== 全局统一匹配管理器（新架构核心）==========
-matcher_manager = MatcherManager()
+matcher_manager: Optional[MatcherManager] = None
 
 # ========== 前置意图分类器 ==========
-intent_classifier = PreIntentClassifier()
+intent_classifier: Optional[PreIntentClassifier] = None
+
+
+def get_matcher_manager() -> MatcherManager:
+    global matcher_manager
+    if matcher_manager is None:
+        matcher_manager = MatcherManager()
+    return matcher_manager
+
+
+def get_intent_classifier() -> PreIntentClassifier:
+    global intent_classifier
+    if intent_classifier is None:
+        intent_classifier = PreIntentClassifier()
+    return intent_classifier
 
 # ========== 模块化意图提取器（未来扩展用） ==========
 class IntentExtractor:
@@ -207,11 +225,11 @@ class ExtensibleFusionQueryManager:
                 # ==============================================
                 # 【关键】使用新架构的 MatcherManager
                 # ==============================================
-                self.ipa_matcher = matcher_manager
+                self.ipa_matcher = get_matcher_manager()
 
                 # 从新 IPA 匹配器获取所有 IPA 列表
-                all_ipa = matcher_manager.ipa_matcher.all_ipa_list
-                tone_free_ipa = getattr(matcher_manager.ipa_matcher, "all_tone_free_ipa_list", [])
+                all_ipa = self.ipa_matcher.ipa_matcher.all_ipa_list
+                tone_free_ipa = getattr(self.ipa_matcher.ipa_matcher, "all_tone_free_ipa_list", [])
                 self.known_ipa_forms = {self._strip_route_marks(item) for item in all_ipa + tone_free_ipa}
                 cache = IPACharCache(all_ipa)
                 self.valid_ipa_chars = cache.get_chars()
@@ -237,10 +255,9 @@ class ExtensibleFusionQueryManager:
 
         return "original"
 
-    def query(self, user_input: str) -> str:
-        """统一查询入口：使用前置意图分类器进行分流"""
-        # 使用前置意图分类器判断意图
-        classification = intent_classifier.classify(user_input)
+    def query_detail(self, user_input: str) -> Dict[str, Any]:
+        """统一查询入口：返回可直接用于 API 的结构化结果"""
+        classification = get_intent_classifier().classify(user_input)
         intent = classification["intent"]
         confidence = classification["confidence"]
         
@@ -248,51 +265,58 @@ class ExtensibleFusionQueryManager:
         
         # 根据意图类型调用对应匹配器
         if intent == "dialect":
-            return self._dialect_query_path(user_input)
+            results = self._dialect_query_items(user_input)
         elif intent == "ipa":
-            return self._ipa_query_path(user_input)
+            results = self._ipa_query_items(user_input)
         elif intent == "pinyin":
-            return self._pinyin_query_path(user_input)
+            results = self._pinyin_query_items(user_input)
         elif intent == "pinyin_llm":
             # 拼音LLM查询：提取拼音片段进行匹配
             pinyin_parts = classification.get("pinyin_parts", [])
-            return self._pinyin_llm_query_path(user_input, pinyin_parts)
+            results = self._pinyin_llm_query_items(user_input, pinyin_parts)
         elif intent == "mixed":
             # 混合查询：同时包含中文和拼音，尝试多路径查询
-            return self._mixed_query_path(user_input)
+            results = self._mixed_query_items(user_input)
         else:  # text
-            return self._original_query_path(user_input)
+            results = self._original_query_items(user_input)
 
-    def _ipa_query_path(self, user_input: str) -> str:
+        adapted_results = self._adapt(results)
+        return {
+            "query": user_input,
+            "intent": intent,
+            "confidence": confidence,
+            "count": len(adapted_results),
+            "results": adapted_results,
+            "formatted": format_result(adapted_results),
+        }
+
+    def query(self, user_input: str) -> str:
+        """兼容原有 CLI 入口，仍然返回格式化文本"""
+        return self.query_detail(user_input)["formatted"]
+
+    def _ipa_query_items(self, user_input: str) -> List[Dict]:
         """
         新版 IPA 查询：
         自动支持 → 简易发音精准 + 标准IPA精准 + 模糊匹配
         """
         res = self.ipa_matcher.ipa_query(user_input, top_k=5)
         if res:
-            return format_result(self._adapt(res))
-        return "未匹配到对应 IPA 词条"
+            return res
+        return []
 
-    def _original_query_path(self, user_input: str) -> str:
+    def _original_query_items(self, user_input: str) -> List[Dict]:
         # 使用 MatcherManager 中封装的原始查询入口（parse_query + core_search）
-        result = self.ipa_matcher.core_query(user_input)
-        return format_result(self._adapt(result))  # 统一调用 _adapt
+        return self.ipa_matcher.core_query(user_input)
 
-    def _dialect_query_path(self, user_input: str) -> str:
+    def _dialect_query_items(self, user_input: str) -> List[Dict]:
         """方言词查询路径"""
-        res = matcher_manager.dialect_word_query(user_input, top_k=5)
-        if res:
-            return format_result(self._adapt(res))
-        return "未匹配到对应方言词条"
+        return get_matcher_manager().dialect_word_query(user_input, top_k=5) or []
 
-    def _pinyin_query_path(self, user_input: str) -> str:
+    def _pinyin_query_items(self, user_input: str) -> List[Dict]:
         """拼音查询路径"""
-        res = matcher_manager.pinyin_query(user_input, top_k=5)
-        if res:
-            return format_result(self._adapt(res))
-        return "未匹配到对应拼音词条"
+        return get_matcher_manager().pinyin_query(user_input, top_k=5) or []
 
-    def _pinyin_llm_query_path(self, user_input: str, pinyin_parts: List[str]) -> str:
+    def _pinyin_llm_query_items(self, user_input: str, pinyin_parts: List[str]) -> List[Dict]:
         """
         拼音LLM查询路径：处理方言词+拼音组合查询
         
@@ -309,7 +333,7 @@ class ExtensibleFusionQueryManager:
         # 如果没有提取到拼音片段，直接降级
         if not pinyin_parts:
             print(f"[降级处理] 未提取到拼音片段，使用原始查询路径")
-            return self._original_query_path(user_input)
+            return self._original_query_items(user_input)
         
         # 对每个提取的拼音片段进行匹配（去重后）
         seen_parts = set()
@@ -326,16 +350,16 @@ class ExtensibleFusionQueryManager:
                 
                 # 查询方言词部分
                 if chinese_part:
-                    dialect_res = matcher_manager.dialect_word_query(chinese_part, top_k=5)
+                    dialect_res = get_matcher_manager().dialect_word_query(chinese_part, top_k=5)
                     results.extend(dialect_res)
                 
                 # 查询拼音部分
                 if pinyin_part:
-                    pinyin_res = matcher_manager.pinyin_query(pinyin_part, top_k=5)
+                    pinyin_res = get_matcher_manager().pinyin_query(pinyin_part, top_k=5)
                     results.extend(pinyin_res)
             else:
                 # 纯拼音片段
-                pinyin_res = matcher_manager.pinyin_query(part, top_k=5)
+                pinyin_res = get_matcher_manager().pinyin_query(part, top_k=5)
                 results.extend(pinyin_res)
         
         # 去重（按方言词）
@@ -348,13 +372,13 @@ class ExtensibleFusionQueryManager:
                 unique_results.append(res)
         
         if unique_results:
-            return format_result(self._adapt(unique_results))
+            return unique_results
         
         # 降级处理：拼音匹配失败，尝试原始文本查询
         print(f"[降级处理] 拼音匹配失败，使用原始查询路径")
-        return self._original_query_path(user_input)
+        return self._original_query_items(user_input)
 
-    def _mixed_query_path(self, user_input: str) -> str:
+    def _mixed_query_items(self, user_input: str) -> List[Dict]:
         """
         混合查询路径：同时包含中文和拼音的查询
         
@@ -370,12 +394,12 @@ class ExtensibleFusionQueryManager:
         results.extend(core_res)
         
         # 2. 尝试拼音查询（提取拼音部分）
-        pinyin_parts = intent_classifier._extract_pinyin_parts(user_input)
+        pinyin_parts = get_intent_classifier()._extract_pinyin_parts(user_input)
         if pinyin_parts:
             for part in pinyin_parts:
                 # 只处理纯拼音片段
                 if not any(char >= '\u4e00' and char <= '\u9fa5' for char in part):
-                    pinyin_res = matcher_manager.pinyin_query(part, top_k=3)
+                    pinyin_res = get_matcher_manager().pinyin_query(part, top_k=3)
                     results.extend(pinyin_res)
         
         # 3. 去重
@@ -388,8 +412,8 @@ class ExtensibleFusionQueryManager:
                 unique_results.append(res)
         
         if unique_results:
-            return format_result(self._adapt(unique_results))
-        return "未匹配到对应词条"
+            return unique_results
+        return []
 
     def _adapt(self, res):
         adapted = []
@@ -403,8 +427,112 @@ class ExtensibleFusionQueryManager:
             })
         return adapted
 
+
+class QueryHTTPRequestHandler(BaseHTTPRequestHandler):
+    manager: Optional[ExtensibleFusionQueryManager] = None
+
+    @classmethod
+    def get_manager(cls) -> ExtensibleFusionQueryManager:
+        if cls.manager is None:
+            cls.manager = ExtensibleFusionQueryManager()
+        return cls.manager
+
+    def _write_json(self, status_code: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self) -> Dict[str, Any]:
+        content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length <= 0:
+            return {}
+        raw_body = self.rfile.read(content_length).decode("utf-8")
+        if not raw_body.strip():
+            return {}
+        try:
+            return json.loads(raw_body)
+        except json.JSONDecodeError:
+            return {}
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+
+        if parsed.path == "/health":
+            self._write_json(200, {"ok": True, "message": "service running"})
+            return
+
+        if parsed.path == "/":
+            self._write_json(200, {
+                "ok": True,
+                "message": "请使用 /query?query=xxx、POST /query 或直接访问 /你的查询词",
+                "examples": ["/query?query=郎", "/郎", "/郎罢"],
+            })
+            return
+
+        if parsed.path == "/query":
+            params = parse_qs(parsed.query)
+            query_text = params.get("query", [""])[0].strip()
+            if not query_text:
+                self._write_json(400, {"ok": False, "error": "query 参数不能为空"})
+                return
+            self._write_json(200, {"ok": True, **self.get_manager().query_detail(query_text)})
+            return
+
+        # 浏览器直连访问：localhost:8088/用户输入要查询的内容
+        if parsed.path.startswith("/"):
+            raw_query = unquote(parsed.path.lstrip("/")).strip()
+            if raw_query:
+                self._write_json(200, {"ok": True, **self.get_manager().query_detail(raw_query)})
+                return
+
+        self._write_json(404, {"ok": False, "error": "not found"})
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/query":
+            self._write_json(404, {"ok": False, "error": "not found"})
+            return
+
+        payload = self._read_json_body()
+        query_text = str(payload.get("query", "")).strip()
+        if not query_text:
+            self._write_json(400, {"ok": False, "error": "请求体中的 query 不能为空"})
+            return
+
+        self._write_json(200, {"ok": True, **self.get_manager().query_detail(query_text)})
+
+
+def run_server(host: str = "0.0.0.0", port: int = 8088) -> None:
+    server = ThreadingHTTPServer((host, port), QueryHTTPRequestHandler)
+    print(f"HTTP 服务已启动：http://{host}:{port}")
+    print("可用接口：GET /health, GET /query?query=..., POST /query, GET /<query>")
+    server.serve_forever()
+
 # ========== main ==========
 def main():
+    parser = argparse.ArgumentParser(description="莆仙方言精准检索系统")
+    parser.add_argument("--mode", choices=["serve", "cli"], default="serve", help="启动模式，serve 为 HTTP 服务，cli 为命令行交互")
+    parser.add_argument("--host", default="0.0.0.0", help="HTTP 服务监听地址")
+    parser.add_argument("--port", type=int, default=8088, help="HTTP 服务端口")
+    args = parser.parse_args()
+
+    if args.mode == "serve":
+        run_server(args.host, args.port)
+        return
+
     manager = ExtensibleFusionQueryManager()
 
     print("="*60)
