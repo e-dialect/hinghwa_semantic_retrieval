@@ -75,7 +75,7 @@ def call_llm_parser(user_query: str) -> Optional[Dict]:
     """调用LLM提取拼音片段和方言词"""
     api_key = os.getenv("DEEPSEEK_API_KEY")
     base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
     if not api_key:
         return None

@@ -4,7 +4,7 @@
 """
 from typing import Dict
 
-# 声母映射（莆拼 → IPA，参考规范文档）
+# 声母映射（莆拼 → IPA）
 PUTIAN_INITIALS = {
     'b': 'p', 'p': 'pʰ', 'bb': 'b',
     'd': 't', 't': 'tʰ', 'dd': 'd',
