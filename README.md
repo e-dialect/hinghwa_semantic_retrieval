@@ -14,7 +14,7 @@
 先激活虚拟环境：
 
 ```powershell
-.\venv\Scripts\Activate.ps1
+\.\.venv\Scripts\Activate.ps1
 ```
 
 启动 HTTP 服务：
@@ -28,6 +28,34 @@ python demo.py --mode serve --port 8088
 ```powershell
 python demo.py --mode cli
 ```
+
+## Django 接口服务
+
+如果你要把当前检索能力封装给主项目调用，建议使用仓库内新增的 Django 外壳，而不是改动现有 `demo.py` 的服务逻辑。
+
+启动方式：
+
+```powershell
+python django_service\manage.py runserver 0.0.0.0:8000
+```
+
+接口地址：
+
+- `GET /api/health/`
+- `GET /api/query/?query=郎`
+- `POST /api/query/`
+
+POST 请求体示例：
+
+```json
+{
+	"query": "郎"
+}
+```
+
+返回结构与当前 `demo.py` 的 `query_detail()` 一致，外层统一补充 `ok` 字段，方便主项目直接判断请求是否成功。
+
+更完整的部署和接入流程见 [docs/django_integration.md](docs/django_integration.md)。
 
 ## 接口说明
 

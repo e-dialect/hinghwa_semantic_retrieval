@@ -13,6 +13,9 @@ numpy>=1.26.0
 # API网络请求 (DeepSeek接口调用)
 requests>=2.31.0
 
+# Web 框架封装层
+Django>=5.0,<6.0
+
 # 安全配置 (隐藏API Key，.env文件)
 python-dotenv>=1.0.0
 
