@@ -6,7 +6,7 @@
 
 - Python 3.13
 - HTTP 服务：标准库 `http.server`，使用 `ThreadingHTTPServer` 提供 8088 端口访问
-- 检索能力：Excel 数据加载、FAISS 向量检索、IPA / 拼音 / 方言词匹配、结果格式化
+- 检索能力：Django ORM 数据加载、FAISS 向量检索、IPA / 拼音 / 方言词匹配、结果格式化
 - 依赖安装：`pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple`
 
 ## 启动方式
