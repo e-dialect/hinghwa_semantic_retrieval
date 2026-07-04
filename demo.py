@@ -3,7 +3,7 @@ from src.result_formatter import format_result
 from src.matcher import MatcherManager
 from src.pre_intent_classifier import PreIntentClassifier
 from src.utils.common_utils import clean_ipa_str
-from src.data_loader import FIELD_MAPPING
+from src.data_loader import FIELD_MAPPING, get_word_word_dto_by_id
 from typing import List, Dict, Optional, Set, Any
 import re
 import argparse
@@ -418,13 +418,26 @@ class ExtensibleFusionQueryManager:
     def _adapt(self, res):
         adapted = []
         for item in res:
-            adapted.append({
-                "id": item.get("id"),
-                FIELD_MAPPING["dialect_word"]: item.get("方言词"),
-                FIELD_MAPPING["simple_pron"]: item.get("简易发音"),
-                FIELD_MAPPING["standard_pron"]: item.get("标准发音"),
-                FIELD_MAPPING["definition"]: item.get("释义注释"),
-            })
+            dto = get_word_word_dto_by_id(item.get("id"))
+            if dto is None:
+                dto = {
+                    "id": item.get("id"),
+                    "word": item.get("方言词", ""),
+                    "definition": "",
+                    "annotation": "",
+                    "mandarin": "",
+                    "standard_ipa": item.get("标准发音", ""),
+                    "standard_pinyin": item.get("简易发音", ""),
+                    "views": 0,
+                    "visibility": False,
+                    "contributor_id": 0,
+                    "tags": "",
+                    "方言词": item.get("方言词", ""),
+                    "简易发音": item.get("简易发音", ""),
+                    "标准发音": item.get("标准发音", ""),
+                    "释义注释": item.get("释义注释", ""),
+                }
+            adapted.append(dto)
         return adapted
 
 

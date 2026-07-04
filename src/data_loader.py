@@ -46,6 +46,27 @@ def _combine_definition(definition: str, annotation: str) -> str:
     return definition or annotation
 
 
+def _normalize_word_word_item(item: dict) -> dict:
+    combined_definition = _combine_definition(item.get("definition", ""), item.get("annotation", ""))
+    return {
+        "id": int(item.get("id", 0) or 0),
+        "word": str(item.get("word", "")).strip(),
+        "definition": str(item.get("definition", "")).strip(),
+        "annotation": str(item.get("annotation", "")).strip(),
+        "mandarin": str(item.get("mandarin", "")).strip(),
+        "standard_ipa": str(item.get("standard_ipa", "")).strip(),
+        "standard_pinyin": str(item.get("standard_pinyin", "")).strip(),
+        "views": int(item.get("views", 0) or 0),
+        "visibility": bool(item.get("visibility", False)),
+        "contributor_id": int(item.get("contributor_id", 0) or 0),
+        "tags": str(item.get("tags", "")).strip(),
+        "方言词": str(item.get("word", "")).strip(),
+        "简易发音": str(item.get("standard_pinyin", "")).strip(),
+        "标准发音": str(item.get("standard_ipa", "")).strip(),
+        "释义注释": combined_definition,
+    }
+
+
 def _fetch_word_word_rows() -> List[dict]:
     _ensure_django()
     from django_service.api.models import WordWord
@@ -66,17 +87,44 @@ def _fetch_word_word_rows() -> List[dict]:
     )
 
     for item in queryset:
-        rows.append(
-            {
-                "id": int(item.get("id", 0)),
-                "方言词": str(item.get("word", "")).strip(),
-                "简易发音": str(item.get("standard_pinyin", "")).strip(),
-                "标准发音": str(item.get("standard_ipa", "")).strip(),
-                "释义注释": _combine_definition(item.get("definition", ""), item.get("annotation", "")),
-            }
-        )
+        rows.append({
+            "id": int(item.get("id", 0)),
+            "方言词": str(item.get("word", "")).strip(),
+            "简易发音": str(item.get("standard_pinyin", "")).strip(),
+            "标准发音": str(item.get("standard_ipa", "")).strip(),
+            "释义注释": _combine_definition(item.get("definition", ""), item.get("annotation", "")),
+        })
 
     return rows
+
+
+def get_word_word_dto_by_id(word_id: int | str) -> dict | None:
+    """按 word_word 表主键反查并返回完整 DTO。"""
+    _ensure_django()
+    from django_service.api.models import WordWord
+
+    try:
+        pk = int(word_id)
+    except (TypeError, ValueError):
+        return None
+
+    item = WordWord.objects.filter(id=pk).values(
+        "id",
+        "word",
+        "definition",
+        "annotation",
+        "mandarin",
+        "standard_ipa",
+        "standard_pinyin",
+        "views",
+        "visibility",
+        "contributor_id",
+        "tags",
+    ).first()
+    if not item:
+        return None
+
+    return _normalize_word_word_item(item)
 
 
 def load_excel_data() -> Tuple[pd.DataFrame, List[str]]:

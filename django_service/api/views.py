@@ -7,6 +7,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from demo import ExtensibleFusionQueryManager
+from src.data_loader import get_word_word_dto_by_id
+from src.result_formatter import format_result
 
 
 _MANAGER: Optional[ExtensibleFusionQueryManager] = None
@@ -54,11 +56,33 @@ def _extract_query_text(request: HttpRequest) -> str:
     return str(payload.get("query", "")).strip()
 
 
+def _dto_to_api_payload(dto: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "ok": True,
+        "query_id": dto.get("id"),
+        "count": 1,
+        "results": [dto],
+        "formatted": format_result([dto]),
+    }
+
+
 @require_http_methods(["GET", "OPTIONS"])
 def health_view(request: HttpRequest) -> JsonResponse:
     if request.method == "OPTIONS":
         return _options_response()
     return _json_response(200, {"ok": True, "message": "service running"})
+
+
+@require_http_methods(["GET", "OPTIONS"])
+def query_by_id_view(request: HttpRequest, word_id: int) -> JsonResponse:
+    if request.method == "OPTIONS":
+        return _options_response()
+
+    dto = get_word_word_dto_by_id(word_id)
+    if dto is None:
+        return _json_response(404, {"ok": False, "error": f"未找到 id={word_id} 对应的词条"})
+
+    return _json_response(200, _dto_to_api_payload(dto))
 
 
 @require_http_methods(["GET", "POST", "OPTIONS"])
