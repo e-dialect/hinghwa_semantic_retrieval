@@ -7,7 +7,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from demo import ExtensibleFusionQueryManager
-from src.data_loader import get_word_word_dto_by_id
+from src.data_loader import get_word_word_dto_by_id, get_word_word_dtos_by_word
 from src.result_formatter import format_result
 
 
@@ -59,10 +59,23 @@ def _extract_query_text(request: HttpRequest) -> str:
 def _dto_to_api_payload(dto: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "ok": True,
+        "query_key": dto.get("id"),
+        "query_type": "id",
         "query_id": dto.get("id"),
         "count": 1,
         "results": [dto],
         "formatted": format_result([dto]),
+    }
+
+
+def _dto_list_to_api_payload(query_key: str, dtos: list[Dict[str, Any]], query_type: str) -> Dict[str, Any]:
+    return {
+        "ok": True,
+        "query_key": query_key,
+        "query_type": query_type,
+        "count": len(dtos),
+        "results": dtos,
+        "formatted": format_result(dtos),
     }
 
 
@@ -83,6 +96,23 @@ def query_by_id_view(request: HttpRequest, word_id: int) -> JsonResponse:
         return _json_response(404, {"ok": False, "error": f"未找到 id={word_id} 对应的词条"})
 
     return _json_response(200, _dto_to_api_payload(dto))
+
+
+@require_http_methods(["GET", "OPTIONS"])
+def query_by_word_view(request: HttpRequest, word: str) -> JsonResponse:
+    if request.method == "OPTIONS":
+        return _options_response()
+
+    query_word = str(word).strip()
+    if not query_word:
+        return _json_response(400, {"ok": False, "error": "word 路径参数不能为空"})
+
+    dtos = get_word_word_dtos_by_word(query_word)
+    if dtos:
+        return _json_response(200, _dto_list_to_api_payload(query_word, dtos, "word"))
+
+    result = get_manager().query_detail(query_word)
+    return _json_response(200, {"ok": True, "query_key": query_word, "query_type": "general", **result})
 
 
 @require_http_methods(["GET", "POST", "OPTIONS"])

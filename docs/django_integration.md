@@ -31,6 +31,10 @@
 
 ### 查询接口
 
+`GET /api/query/id/123/`
+
+`GET /api/query/word/郎罢/`
+
 `GET /api/query/?query=郎`
 
 `POST /api/query/`
@@ -77,6 +81,8 @@ python django_service\manage.py runserver 0.0.0.0:8000
 
 ```text
 http://127.0.0.1:8000/api/health/
+http://127.0.0.1:8000/api/query/id/123/
+http://127.0.0.1:8000/api/query/word/郎罢/
 http://127.0.0.1:8000/api/query/?query=郎
 ```
 
@@ -94,6 +100,16 @@ Python 示例：
 import requests
 
 resp = requests.get("http://127.0.0.1:8000/api/query/", params={"query": "郎"}, timeout=15)
+data = resp.json()
+```
+
+按主键或方言词查询时，也可以直接调用：
+
+```python
+resp = requests.get("http://127.0.0.1:8000/api/query/id/123/", timeout=15)
+data = resp.json()
+
+resp = requests.get("http://127.0.0.1:8000/api/query/word/郎罢/", timeout=15)
 data = resp.json()
 ```
 

@@ -42,7 +42,8 @@ python django_service\manage.py runserver 0.0.0.0:8000
 接口地址：
 
 - `GET /api/health/`
-- `GET /api/query/word/123/`
+- `GET /api/query/id/123/`
+- `GET /api/query/word/郎罢/`
 - `GET /api/query/郎`
 - `GET /api/query/?query=郎`
 - `POST /api/query/`
@@ -79,7 +80,8 @@ GET http://localhost:8088/health
 ### 2. Apifox 测试接口
 
 ```http
-GET http://127.0.0.1:8000/api/query/word/123/
+GET http://127.0.0.1:8000/api/query/id/123/
+GET http://127.0.0.1:8000/api/query/word/郎罢/
 GET http://127.0.0.1:8000/api/query/郎
 GET http://127.0.0.1:8000/api/query/?query=郎
 POST http://127.0.0.1:8000/api/query/

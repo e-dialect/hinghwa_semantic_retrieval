@@ -127,6 +127,32 @@ def get_word_word_dto_by_id(word_id: int | str) -> dict | None:
     return _normalize_word_word_item(item)
 
 
+def get_word_word_dtos_by_word(word: int | str) -> List[dict]:
+    """按方言词反查并返回完整 DTO 列表。"""
+    _ensure_django()
+    from django_service.api.models import WordWord
+
+    word_text = str(word).strip()
+    if not word_text:
+        return []
+
+    querysets = WordWord.objects.filter(word__iexact=word_text).values(
+        "id",
+        "word",
+        "definition",
+        "annotation",
+        "mandarin",
+        "standard_ipa",
+        "standard_pinyin",
+        "views",
+        "visibility",
+        "contributor_id",
+        "tags",
+    ).order_by("id")
+
+    return [_normalize_word_word_item(item) for item in querysets]
+
+
 def load_excel_data() -> Tuple[pd.DataFrame, List[str]]:
     """加载 Django ORM 数据，构建精准倒排索引（方言查方言核心）"""
     global FULL_DF
