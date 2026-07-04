@@ -42,6 +42,7 @@ python django_service\manage.py runserver 0.0.0.0:8000
 接口地址：
 
 - `GET /api/health/`
+- `GET /api/query/郎`
 - `GET /api/query/?query=郎`
 - `POST /api/query/`
 
@@ -77,8 +78,9 @@ GET http://localhost:8088/health
 ### 2. Apifox 测试接口
 
 ```http
-GET http://localhost:8088/query?query=郎
-POST http://localhost:8088/query
+GET http://127.0.0.1:8000/api/query/郎
+GET http://127.0.0.1:8000/api/query/?query=郎
+POST http://127.0.0.1:8000/api/query/
 ```
 
 POST 请求体示例：
@@ -94,8 +96,8 @@ POST 请求体示例：
 可以直接在浏览器地址栏输入：
 
 ```text
-http://localhost:8088/郎
-http://localhost:8088/郎罢
+http://127.0.0.1:8000/api/query/郎
+http://127.0.0.1:8000/api/query/郎罢
 ```
 
 服务会直接返回结构化 JSON 结果，不需要额外前端页面。

@@ -68,6 +68,7 @@ def _fetch_word_word_rows() -> List[dict]:
     for item in queryset:
         rows.append(
             {
+                "id": int(item.get("id", 0)),
                 "方言词": str(item.get("word", "")).strip(),
                 "简易发音": str(item.get("standard_pinyin", "")).strip(),
                 "标准发音": str(item.get("standard_ipa", "")).strip(),

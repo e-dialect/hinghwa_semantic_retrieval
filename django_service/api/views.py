@@ -62,13 +62,13 @@ def health_view(request: HttpRequest) -> JsonResponse:
 
 
 @require_http_methods(["GET", "POST", "OPTIONS"])
-def query_view(request: HttpRequest) -> JsonResponse:
+def query_view(request: HttpRequest, query: str = "") -> JsonResponse:
     if request.method == "OPTIONS":
         return _options_response()
 
-    query_text = _extract_query_text(request)
+    query_text = query.strip() or _extract_query_text(request)
     if not query_text:
-        return _json_response(400, {"ok": False, "error": "query 参数不能为空"})
+        return _json_response(400, {"ok": False, "error": "query 参数或路径参数不能为空"})
 
     result = get_manager().query_detail(query_text)
     return _json_response(200, {"ok": True, **result})

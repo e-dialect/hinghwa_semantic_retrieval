@@ -419,11 +419,11 @@ class ExtensibleFusionQueryManager:
         adapted = []
         for item in res:
             adapted.append({
+                "id": item.get("id"),
                 FIELD_MAPPING["dialect_word"]: item.get("方言词"),
                 FIELD_MAPPING["simple_pron"]: item.get("简易发音"),
                 FIELD_MAPPING["standard_pron"]: item.get("标准发音"),
                 FIELD_MAPPING["definition"]: item.get("释义注释"),
-                "相似度": item.get("相似度", 0.0)
             })
         return adapted
 

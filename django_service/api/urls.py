@@ -7,5 +7,6 @@ from .views import health_view, query_view
 
 urlpatterns = [
     path("health/", health_view, name="health"),
+    path("query/<str:query>/", query_view, name="query-with-path"),
     path("query/", query_view, name="query"),
 ]
